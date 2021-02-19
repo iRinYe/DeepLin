@@ -24,6 +24,7 @@ from tqdm import tqdm
 # 共有超参数
 publicHyperParams = {
     'seed': 1,  # 随机种子
+    # jobID: 每次运行代码会生成统一的随机jodID，请勿尝试更改，会严重影响模型训练与测试结果
     'jobID': None,
 }
 
@@ -40,11 +41,12 @@ class DeepLing:
         :param lossFunc: 损失函数
             'CEP':CrossEntropy；
             'MSE':MSELoss;
-            todo 直接支持LossFunction
+            或是直接送入'torch.nn.modules.loss'下的损失函数
         :param optFunc: 优化函数
-            'RAdam': RAdam（默认）
-            'SGD': SGD
-            'Adam': Adam
+            'RAdam': RAdam（默认）;
+            'SGD': SGD;
+            'Adam': Adam;
+            或是直接送入'torch.optim'下的优化函数
         :param epoch: 没什么好说的
         :param early_stop: 早停的等待次数，当其为0时禁用早停
         :param batch_size: 没什么好说的
@@ -79,7 +81,10 @@ class DeepLing:
         elif lossFunc == "MSE":
             self.loss_func = torch.nn.MSELoss()
         else:
-            raise RuntimeError('请选择适合的loss函数！')
+            if 'torch.nn.modules.loss' in str(type(lossFunc)):
+                self.loss_func = lossFunc
+            else:
+                raise RuntimeError('请选择适合的loss函数！')
 
         self.modelName = self.model.modelName + "_" + self.jobID
 
@@ -110,7 +115,10 @@ class DeepLing:
         elif optFunc == 'SGD':
             self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         else:
-            raise RuntimeError('请选择适合的优化函数！')
+            if 'torch.optim' in str(type(optFunc)):
+                self.loss_func = lossFunc
+            else:
+                raise RuntimeError('请选择适合的优化函数！')
 
         if self.isSelf and self.p_Labels:
             raise RuntimeError('伪标签（半监督）训练无法在无监督模式下工作！')
