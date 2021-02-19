@@ -90,12 +90,12 @@ model = DeepLing(modelClass, lossFunc, optFunc='RAdam',
 * lossFunc：损失函数
     * 'CEP'：CrossEntropyLoss
     * 'MSE'：MSELoss
-    * 直接支持LossFunction【todo】
+    * 直接支持'torch.nn.modules.loss'下的损失函数
 * optFunc：优化函数
     * 'RAdam': RAdam（默认）
     * 'SGD': SGD
     * 'Adam': Adam
-    * 直接支持optFunction【todo】
+    * 直接支持'torch.optim'下的优化函数
 * epoch：训练次数，int，默认为10
 * early_stop：提前终止的等待次数，当其为0时禁用提前终止，默认为0
 * batch_size：一批的样本数
