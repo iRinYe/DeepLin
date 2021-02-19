@@ -54,10 +54,12 @@ class DeepLing:
         :param l1: l1范数的权重，默认为0（不启用）
         :param l2: l2范数的权重，默认为0（不启用）
         :param weight: 网络的初始化权重
+
         :param p_Labels: 是否使用伪标签进行训练
-        :param a: 退火算法相关
-        :param T1: 退火算法相关
-        :param T2: 退火算法相关
+            当使用伪标签进行训练时，务必提供a，T1与T2
+            :param a: 退火算法的默认权重，不能为0
+            :param T1: 退火算法中第一阶段的时间，大于0小于T2
+            :param T2: 退火算法中第二阶段的时间，大于T1小于Epoch
 
         :param isCuda: 是否使用GPU进行训练
         :param isSelf: 是否是无标签学习
@@ -122,6 +124,14 @@ class DeepLing:
 
         if self.isSelf and self.p_Labels:
             raise RuntimeError('伪标签（半监督）训练无法在无监督模式下工作！')
+
+        if self.p_Labels:
+            if T1 == T2:
+                raise RuntimeError('伪标签（半监督）训练的两个阶段的时间不能相同')
+            elif T2 < T1:
+                raise RuntimeError('伪标签（半监督）训练的两个阶段的时间写反了')
+            if a == 0:
+                raise RuntimeError('伪标签（半监督）训练的模拟退火权重不能为0')
 
     def __recurrentMode(self, seed=1):
         """
@@ -219,6 +229,10 @@ class DeepLing:
 
         if y is not None:
             y = np.array(y, dtype='float')
+            if self.p_Labels:
+                # 如果使用伪标签进行训练，则有一列真实标签与一列虚假标签
+                y = np.repeat(y, 2, 1)
+                y[:, -1] = (y[:, -1] - 0.5) * 2
             y_tenser = torch.Tensor.long(torch.from_numpy(y))
             dataset = TensorDataset(x_tenser, y_tenser)
         else:
@@ -230,7 +244,7 @@ class DeepLing:
         else:
             self.dl_test = dataloader
 
-    def __trainProcess(self, batch_data, t=None):
+    def __trainProcess(self, batch_data, t):
         model = self.model
         model.train()
         b_x, b_y = self.cudaSTH(batch_data)
@@ -261,14 +275,14 @@ class DeepLing:
                 if sum(t_Labels_index) != 0:
                     # 如果存在真实标签样本
                     p_loss = self.loss_func(pred[p_Labels_index],
-                                            b_y[p_Labels_index][:, 0].float().view(-1, 1))  # 伪标签损失
+                                            b_y[p_Labels_index][:, 0].long().view(-1))  # 伪标签损失
                     t_loss = self.loss_func(pred[t_Labels_index],
-                                            b_y[t_Labels_index][:, 0].float().view(-1, 1))  # 真实标签损失
-                    a_pie = self.SAA(t)
+                                            b_y[t_Labels_index][:, 0].long().view(-1))  # 真实标签损失
+                    a_pie = self.__SAA(t)
                     loss = t_loss + a_pie * p_loss
                 else:
                     p_loss = self.loss_func(pred[p_Labels_index],
-                                            b_y[p_Labels_index][:, 0].float().view(-1, 1))  # 伪标签损失
+                                            b_y[p_Labels_index][:, 0].long().view(-1))  # 伪标签损失
                     a_pie = self.SAA(t)
                     loss = a_pie * p_loss
 
@@ -319,7 +333,7 @@ class DeepLing:
             step = 0
 
             for batch_data in self.dl_training if self.showLoss else tqdm(self.dl_training):
-                loss, b_y = self.__trainProcess(batch_data)
+                loss, b_y = self.__trainProcess(batch_data, epoch)
                 new_epoch_loss += loss
 
                 if self.p_Labels == 1:
@@ -330,7 +344,11 @@ class DeepLing:
             step += 1
 
             if self.showLoss is True:
-                tqdm.write("epoch:{}/{} loss: {}".format(epoch + 1, self.EPOCH, round(new_epoch_loss / step, 4)))
+                print("epoch:{}/{} loss: {}".format(epoch + 1, self.EPOCH, round(new_epoch_loss / step, 4)))
+                if self.p_Labels:
+                    print("      正例数变为:{}, 负例数变为:{}".format(
+                        (self.dl_training.dataset.tensors[1].data[:, 0] == 1).sum(),
+                        (self.dl_training.dataset.tensors[1].data[:, 0] == 0).sum()))
 
             if ES is not None:
                 ES(round(new_epoch_loss, 3), self.model)
