@@ -83,14 +83,13 @@ class DeepLing:
 
         self.modelName = self.model.modelName + "_" + self.jobID
 
-        self._isCuda = isCuda
-        self.isRAdam = 1 if optFunc == 'RAdam' else 0
+        self.isCuda = isCuda
         self.EPOCH = epoch
         self.lr = lr
         self.weight_decay = l2
         self.weight = weight
         self.batch_size = batch_size
-        self.lamda = l1
+        self.l1 = l1
         self.EarlyStop = early_stop
 
         self.p_Labels = p_Labels
@@ -254,13 +253,13 @@ class DeepLing:
 
                 b_y[p_Labels_index][:, 0] = pred[p_Labels_index].argmax(dim=1)
 
-        if self.lamda != 0:
+        if self.l1 != 0:
             # lamda不为0时计算l1范式
             regularization_loss = 0
             for param in model.parameters():
                 regularization_loss += torch.sum(abs(param))
 
-            loss = loss + self.lamda * regularization_loss
+            loss = loss + self.l1 * regularization_loss
 
         self.optimizer.zero_grad()
 
@@ -422,10 +421,6 @@ class DeepLing:
 
         print("AUC: {}, AUPR: {}".format(round(auc_value, 8), round(aupr_value, 8)))
 
-    @property
-    def isCuda(self):
-        return self._isCuda
-
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
@@ -483,7 +478,7 @@ class EarlyStopping:
         """
         if self.verbose:
             self.trace_func(
-                f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+                f'      Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
 
