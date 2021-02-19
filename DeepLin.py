@@ -112,6 +112,9 @@ class DeepLing:
         else:
             raise RuntimeError('请选择适合的优化函数！')
 
+        if self.isSelf and self.p_Labels:
+            raise RuntimeError('伪标签（半监督）训练无法在无监督模式下工作！')
+
     def __recurrentMode(self, seed=1):
         """
         启动复现模式，调用该方法将尽可能的确保模型的可复现性
@@ -147,7 +150,13 @@ class DeepLing:
             cudaTH = ()
             for item in STH:
                 if item is not None:
-                    cudaTH += (item.cpu(),)
+                    if type(item) != list:
+                        cudaTH += (item.cpu(),)
+                    else:
+                        tmp = []
+                        for tmp_item in item:
+                            tmp.append(tmp_item)
+                        cudaTH += (tmp,)
                 else:
                     cudaTH += (item,)
 
@@ -161,6 +170,11 @@ class DeepLing:
             warnings.warn("未提供Label数据，已自动切换到无监督学习模式.", DeprecationWarning)
             self.loss_func = torch.nn.MSELoss()
             self.isSelf = True
+
+        if y is not None and self.isSelf:
+            warnings.warn("已提供Label数据，但仍选择无监督学习模式，已自动切换到有监督学习模式.", DeprecationWarning)
+            self.isSelf = False
+
         self.__getDataLoader(x, y, isShuffle, preShuffle, isTraining=True)
 
     def getTestDataLoader(self, x, y=None, isShuffle=False, preShuffle=False):
@@ -208,11 +222,10 @@ class DeepLing:
         else:
             self.dl_test = dataloader
 
-    def __trainProcess(self, b_x, b_y=None, t=None):
-
+    def __trainProcess(self, batch_data, t=None):
         model = self.model
         model.train()
-        b_x, b_y = self.cudaSTH(b_x, b_y)
+        b_x, b_y = self.cudaSTH(batch_data)
 
         if self.isMask:
             mask = b_x[:, int(b_x.size()[1] / 2):]
@@ -222,9 +235,9 @@ class DeepLing:
 
         if b_y is None:
             if self.isMask:
-                loss = self.loss_func(pred * mask, b_x * mask)  # 自动编码器(带MASK)用
+                loss = self.loss_func(pred[1] * mask, b_x * mask)  # 自动编码器(带MASK)用
             else:
-                loss = self.loss_func(pred, b_x)  # 自动编码器（无MASK）用
+                loss = self.loss_func(pred[1], b_x)  # 自动编码器（无MASK）用
         else:
             if self.p_Labels == 0:
                 # 不使用伪标签进行训练
@@ -297,44 +310,25 @@ class DeepLing:
             new_epoch_loss = 0
             step = 0
 
-            if self.isSelf:
-                # 如果是自训练
-                # for b_x in tqdm(self.dl_training):  # 自动编码器用
-                for b_x in self.dl_training:  # 自动编码器用
-                    loss, b_y = self.__trainProcess(b_x=b_x[0])
-                    new_epoch_loss += loss
-                step += 1
-
-                if self.showLoss is True:
-                    tqdm.write("epoch:{}/{} loss: {}".format(epoch+1, self.EPOCH, round(new_epoch_loss / step, 4)))
-
-                if ES is not None:
-                    ES(round(new_epoch_loss, 3), self.model)
-                    if ES.early_stop:
-                        print("Early Stop in {}!!!".format(epoch))
-                        break
-
-            else:
-                for b_x, b_y in self.dl_training:
-                    loss, b_y = self.__trainProcess(b_x=b_x, b_y=b_y)
-
-                    if self.p_Labels == 1:
-                        if newDataset is None:
-                            newDataset = b_y
-                        else:
-                            newDataset = torch.cat((newDataset, b_y))
-
+            for batch_data in self.dl_training if self.showLoss else tqdm(self.dl_training):
+                loss, b_y = self.__trainProcess(batch_data)
                 new_epoch_loss += loss
-                step += 1
 
-                if self.showLoss is True:
-                    tqdm.write("epoch:{}/{} loss: {}".format(epoch+1, self.EPOCH, round(new_epoch_loss / step, 4)))
+                if self.p_Labels == 1:
+                    if newDataset is None:
+                        newDataset = b_y
+                    else:
+                        newDataset = torch.cat((newDataset, b_y))
+            step += 1
 
-                if ES is not None:
-                    ES(round(new_epoch_loss, 3), self.model)
-                    if ES.early_stop:
-                        print("Early Stop in {}!!!".format(epoch))
-                        break
+            if self.showLoss is True:
+                tqdm.write("epoch:{}/{} loss: {}".format(epoch + 1, self.EPOCH, round(new_epoch_loss / step, 4)))
+
+            if ES is not None:
+                ES(round(new_epoch_loss, 3), self.model)
+                if ES.early_stop:
+                    print("Early Stop in {}!!!".format(epoch))
+                    break
 
             if self.p_Labels == 1:
                 self.dl_training.dataset.tensors[1].data = newDataset
@@ -379,7 +373,11 @@ class DeepLing:
 
                     b_x = self.cudaSTH(b_x)
 
-                    temp = model(b_x).cpu().numpy()
+                    if self.isSelf:
+                        temp = model(b_x)[0].cpu().numpy()
+                    else:
+                        temp = model(b_x).cpu().numpy()
+
                     temp = temp.reshape(temp.shape[0], temp.shape[1])
                     if pred is None:
                         pred = temp
