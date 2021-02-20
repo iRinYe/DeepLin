@@ -23,7 +23,7 @@
 * RAdam优化函数
 
 ## 快速上手
-###前期操作：获取数据、定义网络结构等
+### 前期操作：获取数据、定义网络结构等
 ```Python
 from DeepLin import DeepLing
 import torch.nn as nn
@@ -41,7 +41,7 @@ test_label = np.random.randint(0, 2, (500, 1))
 class DemoNet(nn.Module):
     def __init__(self):
         super(DemoNet, self).__init__()
-        self.modelName = "DemoNet"
+        self.modelName = "DemoNet"          # 是为了early stop保存模型参数用的，请务必起个名字
         self.fc = nn.Linear(in_features=10, out_features=2)
 
     def forward(self, x):
@@ -86,31 +86,39 @@ model = DeepLing(modelClass, lossFunc, optFunc='RAdam',
                  isCuda=True, isSelf=False, isMask=False, showLoss=True, opt_level=None)
 ```
 #### 参数说明
-* modelClass：用户定义的PyTorch网络结构，必须提供
+
+
+| 形参名 | 作用 | 数据类型 | 默认值 |
+| --- | --- | --- | --- |
+| modelClass | 用户定义的PyTorch网络结构 | Class | 无 |
+| lossFunc | 损失函数 | str或'torch.nn.modules.loss' | 无 |
+| optFunc | 优化函数 | str或'torch.optim' | 'RAdam' |
+| epoch | 训练次数 | int | 10 |
+| early_stop | 提前终止的等待次数，当其为0时禁用提前终止 | int | 0 |
+| batch_size | 一批的样本数 | int | 128 |
+| lr | 学习率 | float | 0.001 |
+| l1 | l1范数的权重，当其为0时不计算l1范数 | float | 0 |
+| l2 | l2范数的权重，当其为0时不计算l2范数 | float | 0 |
+| p_Labels | 是否使用伪标签（半监督算法）进行训练，当其为0时不使用 | 0或1 | 0 |
+| a | 退火算法的默认权重 | float | 0 |
+| T1 | 退火算法中第一阶段的时间 | int，且0<T1<T2 | 0 |
+| T2 | 退火算法中第二阶段的时间 | int，且T1<T2<epoch | 0 |
+| isCuda | 是否使用GPU训练（前提需要环境支持cuda，否则还是cpu） | boolean | False |
+| isSelf | 是否是无标签学习（例如自动编码器） | boolean | False |
+| isMask | 在训练过程中是否需要使用MASK屏蔽缺失数据 | boolean | False |
+| showLoss | 训练过程中是否显示loss | boolean | False |
+
+此外，DeepLin支持多种损失函数与优化函数，写法如下：
 * lossFunc：损失函数
     * 'CEP'：CrossEntropyLoss
     * 'MSE'：MSELoss
-    * 直接支持'torch.nn.modules.loss'下的损失函数
+    * 直接支持'torch.nn.modules.loss'下的损失函数，可直接传入
 * optFunc：优化函数
     * 'RAdam': RAdam（默认）
     * 'SGD': SGD
     * 'Adam': Adam
-    * 直接支持'torch.optim'下的优化函数
-* epoch：训练次数，int，默认为10
-* early_stop：提前终止的等待次数，当其为0时禁用提前终止，默认为0
-* batch_size：一批的样本数
-* lr：学习率，默认为0.001
-* l1：l1范数的权重，默认为0（不启用）
-* l2：l2范数的权重，默认为0（不启用）
-* weight：网络的初始化权重
-* p_Labels：是否使用伪标签（半监督算法）进行训练
-    当使用伪标签进行训练时，务必提供a，T1与T2
-    * a：退火算法的默认权重
-    * T1：退火算法中第一阶段的时间，大于0小于T2    * T1：退火算法中第二阶段的时间，大于T1小于Epoch
-* isCuda：是否使用GPU训练（前提需要环境支持cuda，否则还是cpu）
-* isSelf：是否是无标签学习（例如自动编码器）
-* isMask：在训练过程中是否需要使用MASK屏蔽缺失数据
-* showLoss：训练过程中是否显示loss
+    * 直接支持'torch.optim'下的优化函数，可直接传入
+
 
 ### 打包训练集
 ```Python
