@@ -125,10 +125,14 @@ model = DeepLing(modelClass, lossFunc, optFunc='RAdam',
 model.getTrainingDataLoader(x, y=None, isShuffle=True, preShuffle=False)
 ```
 #### 参数说明
-* x：特征数据，必须提供，array
-* y：标签数据，可选，array
-* isShuffle：是否打乱数据（利用PyTorch的DataLoader**在训练过程中**实时打乱），默认为True，boolean
-* preShuffle：是否预先打乱数据（数据**在打包过程中**提前打乱）
+
+| 形参名 | 作用 | 数据类型 | 默认值 |
+| --- | --- | --- | --- |
+| x | 样本特征数据 | array | 无，必须提供 |
+| y | 样本标签数据 | array | 无，可选 |
+| isShuffle | 是否打乱数据（利用PyTorch的DataLoader**在训练过程中**实时打乱） | boolean | True |
+| preShuffle | 是否预先打乱数据（数据**在打包过程中**提前打乱） | boolean | False |
+
 > Tips: 当在getTrainingDataLoader中未提供标签数据y时，DeepLin会自动切换到无监督学习模式，同时损失函数会自动切换到MSELoss，暂时不支持更改
 
 ### 训练网络
@@ -140,10 +144,14 @@ model.train()
 model.getTestDataLoader(x, y=None, isShuffle=False, preShuffle=False)
 ```
 #### 参数说明
-* x：特征数据，必须提供，array
-* y：标签数据，可选，array
-* isShuffle：是否打乱数据（利用PyTorch的DataLoader**在训练过程中**实时打乱），默认为False，boolean
-* preShuffle：是否预先打乱数据（数据**在打包过程中**提前打乱），默认为False
+
+| 形参名 | 作用 | 数据类型 | 默认值 |
+| --- | --- | --- | --- |
+| x | 样本特征数据 | array | 无，必须提供 |
+| y | 样本标签数据 | array | 无，可选 |
+| isShuffle | 是否打乱数据（利用PyTorch的DataLoader**在训练过程中**实时打乱） | boolean | False |
+| preShuffle | 是否预先打乱数据（数据**在打包过程中**提前打乱） | boolean | False |
+
 > Tips: 当在getTestDataLoader中要求打乱测试数据时，DeepLin会自动取消打乱操作，并弹出warning，暂时不支持更改
 
 ### 训练网络
